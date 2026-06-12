@@ -3,25 +3,31 @@ import { useNavigate } from 'react-router-dom'
 import { useBooking } from '../context/BookingContext'
 import { generateSeats } from '../data/mockData'
 
-const SEAT_ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+const SEAT_ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+const PREMIUM_ROW = 'G'
 
 function seatClass(seat, isSelected) {
   const base =
-    'w-7 h-7 rounded-sm border text-[10px] font-bold transition-all flex items-center justify-center'
+    'w-9 h-9 rounded-md border text-xs font-bold transition-all flex items-center justify-center'
 
-  if (seat.is_booked) {
+  if (seat.is_booked)
     return `${base} bg-gray-800 border-gray-700 cursor-not-allowed opacity-40`
-  }
-  if (isSelected) {
-    return `${base} bg-cinema-gold border-amber-500 text-black cursor-pointer shadow-lg shadow-amber-500/30`
-  }
-  if (seat.seat_type === 'premium') {
-    return `${base} bg-purple-900/30 border-purple-700/60 text-purple-300 hover:bg-purple-700/40 cursor-pointer`
-  }
-  if (seat.seat_type === 'front') {
+  if (isSelected)
+    return `${base} bg-cinema-gold border-amber-500 text-black cursor-pointer shadow-md shadow-amber-500/40`
+  if (seat.seat_type === 'front')
     return `${base} bg-blue-900/30 border-blue-700/60 text-blue-300 hover:bg-blue-700/40 cursor-pointer`
-  }
   return `${base} bg-cinema-darker border-cinema-border text-gray-500 hover:bg-gray-700 hover:border-gray-500 hover:text-white cursor-pointer`
+}
+
+function premiumSeatClass(seat, isSelected) {
+  const base =
+    'w-10 h-10 rounded-lg border-2 text-xs font-bold transition-all flex items-center justify-center'
+
+  if (seat.is_booked)
+    return `${base} bg-gray-800 border-gray-700 cursor-not-allowed opacity-40`
+  if (isSelected)
+    return `${base} bg-cinema-gold border-amber-400 text-black cursor-pointer shadow-md shadow-amber-500/50`
+  return `${base} bg-purple-900/40 border-purple-600/70 text-purple-200 hover:bg-purple-700/50 hover:border-purple-500 cursor-pointer`
 }
 
 export default function SeatSelection() {
@@ -30,7 +36,6 @@ export default function SeatSelection() {
   const [allSeats, setAllSeats] = useState([])
   const [selected, setSelected] = useState([])
 
-  // Use a stable seed derived from showtime id instead of Math.random
   const seatedRef = useRef(false)
   useEffect(() => {
     if (!booking.selectedShowtime) { navigate('/'); return }
@@ -40,7 +45,7 @@ export default function SeatSelection() {
     const hash = booking.selectedShowtime.id
       .split('')
       .reduce((acc, c) => acc + c.charCodeAt(0), 0)
-    const bookedCount = 15 + (hash % 30)
+    const bookedCount = 5 + (hash % 15)
     setAllSeats(generateSeats(booking.selectedShowtime.id, bookedCount))
   }, [booking.selectedShowtime])
 
@@ -63,6 +68,107 @@ export default function SeatSelection() {
   }
 
   const remaining = totalTickets - selected.length
+
+  const renderRegularRow = (row) => {
+    const rowSeats = allSeats.filter((s) => s.seat_row === row)
+    const mid = Math.floor(rowSeats.length / 2)
+    const left = rowSeats.slice(0, mid)
+    const right = rowSeats.slice(mid)
+
+    return (
+      <div key={row} className="flex items-center gap-2">
+        <span className="w-5 text-right text-gray-600 text-xs font-mono select-none">{row}</span>
+
+        <div className="flex items-center gap-0.5">
+          {left.map((seat) => (
+            <button
+              key={seat.id}
+              onClick={() => toggleSeat(seat)}
+              className={seatClass(seat, !!selected.find((s) => s.id === seat.id))}
+              title={`${seat.seat_row}${seat.seat_number}${seat.is_booked ? ' (booked)' : ''}`}
+            >
+              {seat.seat_number}
+            </button>
+          ))}
+        </div>
+
+        <div className="w-5" />
+
+        <div className="flex items-center gap-0.5">
+          {right.map((seat) => (
+            <button
+              key={seat.id}
+              onClick={() => toggleSeat(seat)}
+              className={seatClass(seat, !!selected.find((s) => s.id === seat.id))}
+              title={`${seat.seat_row}${seat.seat_number}${seat.is_booked ? ' (booked)' : ''}`}
+            >
+              {seat.seat_number}
+            </button>
+          ))}
+        </div>
+
+        <span className="w-5 text-gray-600 text-xs font-mono select-none">{row}</span>
+      </div>
+    )
+  }
+
+  const renderPremiumRow = (row) => {
+    const rowSeats = allSeats.filter((s) => s.seat_row === row)
+    // Group into pairs: [1,2], [3,4], [5,6], [7,8], [9,10]
+    const pairs = []
+    for (let i = 0; i < rowSeats.length; i += 2) {
+      pairs.push(rowSeats.slice(i, i + 2))
+    }
+    const leftPairs = pairs.slice(0, 2)   // pairs (1,2) and (3,4)
+    const rightPairs = pairs.slice(2)      // pairs (5,6) and (7,8)
+
+    return (
+      <div key={row} className="flex items-center gap-2 mt-6 pt-4 border-t border-purple-900/40">
+        <span className="w-5 text-right text-purple-400 text-xs font-mono font-bold select-none">{row}</span>
+
+        {/* Left pairs */}
+        <div className="flex items-center gap-2">
+          {leftPairs.map((pair, pIdx) => (
+            <div key={pIdx} className="flex items-center gap-0.5">
+              {pair.map((seat) => (
+                <button
+                  key={seat.id}
+                  onClick={() => toggleSeat(seat)}
+                  className={premiumSeatClass(seat, !!selected.find((s) => s.id === seat.id))}
+                  title={`${seat.seat_row}${seat.seat_number} — Premium${seat.is_booked ? ' (booked)' : ''}`}
+                >
+                  {seat.seat_number}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* Aisle */}
+        <div className="w-5" />
+
+        {/* Right pairs */}
+        <div className="flex items-center gap-2">
+          {rightPairs.map((pair, pIdx) => (
+            <div key={pIdx} className="flex items-center gap-0.5">
+              {pair.map((seat) => (
+                <button
+                  key={seat.id}
+                  onClick={() => toggleSeat(seat)}
+                  className={premiumSeatClass(seat, !!selected.find((s) => s.id === seat.id))}
+                  title={`${seat.seat_row}${seat.seat_number} — Premium${seat.is_booked ? ' (booked)' : ''}`}
+                >
+                  {seat.seat_number}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <span className="w-5 text-purple-400 text-xs font-mono font-bold select-none">{row}</span>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
@@ -95,72 +201,37 @@ export default function SeatSelection() {
         </div>
 
         {/* Rows */}
-        <div className="flex flex-col gap-1.5 items-center min-w-[500px]">
-          {SEAT_ROWS.map((row) => {
-            const rowSeats = allSeats.filter((s) => s.seat_row === row)
-            const mid = Math.floor(rowSeats.length / 2)
-            const left = rowSeats.slice(0, mid)
-            const right = rowSeats.slice(mid)
+        <div className="flex flex-col gap-2 items-center min-w-[500px]">
+          {SEAT_ROWS.map((row) =>
+            row === PREMIUM_ROW ? renderPremiumRow(row) : renderRegularRow(row)
+          )}
 
-            return (
-              <div key={row} className="flex items-center gap-2">
-                <span className="w-5 text-right text-gray-600 text-xs font-mono select-none">{row}</span>
-
-                <div className="flex items-center gap-0.5">
-                  {left.map((seat) => (
-                    <button
-                      key={seat.id}
-                      onClick={() => toggleSeat(seat)}
-                      className={seatClass(seat, !!selected.find((s) => s.id === seat.id))}
-                      title={`${seat.seat_row}${seat.seat_number} — ${seat.seat_type}${seat.is_booked ? ' (booked)' : ''}`}
-                    >
-                      {seat.seat_number}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Aisle */}
-                <div className="w-5" />
-
-                <div className="flex items-center gap-0.5">
-                  {right.map((seat) => (
-                    <button
-                      key={seat.id}
-                      onClick={() => toggleSeat(seat)}
-                      className={seatClass(seat, !!selected.find((s) => s.id === seat.id))}
-                      title={`${seat.seat_row}${seat.seat_number} — ${seat.seat_type}${seat.is_booked ? ' (booked)' : ''}`}
-                    >
-                      {seat.seat_number}
-                    </button>
-                  ))}
-                </div>
-
-                <span className="w-5 text-gray-600 text-xs font-mono select-none">{row}</span>
-              </div>
-            )
-          })}
+          {/* Premium row label */}
+          <p className="text-purple-400/70 text-xs mt-2 tracking-widest uppercase">
+            ★ Premium Pairs — Row G
+          </p>
         </div>
 
         {/* Legend */}
         <div className="flex flex-wrap justify-center gap-5 mt-8 pt-6 border-t border-cinema-border text-xs text-gray-500">
           <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-sm bg-cinema-darker border border-cinema-border" />
+            <div className="w-5 h-5 rounded-md bg-cinema-darker border border-cinema-border" />
             Standard
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-sm bg-purple-900/30 border border-purple-700/60" />
-            Premium (D–G)
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-sm bg-blue-900/30 border border-blue-700/60" />
+            <div className="w-5 h-5 rounded-md bg-blue-900/30 border border-blue-700/60" />
             Front Row (A)
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-sm bg-cinema-gold border-amber-500 shadow-md shadow-amber-500/30" />
+            <div className="w-5 h-5 rounded-lg bg-purple-900/40 border-2 border-purple-600/70" />
+            Premium Pairs (G)
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-md bg-cinema-gold border border-amber-500 shadow-md shadow-amber-500/30" />
             Selected
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-sm bg-gray-800 border border-gray-700 opacity-40" />
+            <div className="w-5 h-5 rounded-md bg-gray-800 border border-gray-700 opacity-40" />
             Unavailable
           </div>
         </div>

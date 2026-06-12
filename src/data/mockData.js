@@ -96,9 +96,9 @@ function generateShowtimes(movieId) {
 
 export const MOCK_SHOWTIMES = MOCK_MOVIES.flatMap((m) => generateShowtimes(m.id))
 
-export function generateSeats(showtimeId, bookedCount = 25) {
-  const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
-  const seatsPerRow = 14
+export function generateSeats(showtimeId, bookedCount = 15) {
+  const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+  const seatsPerRow = 10
   const seats = []
 
   const bookedKeys = new Set()
@@ -111,10 +111,12 @@ export function generateSeats(showtimeId, bookedCount = 25) {
   }
 
   rows.forEach((row, rowIdx) => {
-    for (let seatNum = 1; seatNum <= seatsPerRow; seatNum++) {
+    const isPremiumRow = rowIdx === rows.length - 1
+    const rowSeatCount = isPremiumRow ? 8 : seatsPerRow
+    for (let seatNum = 1; seatNum <= rowSeatCount; seatNum++) {
       let seatType = 'standard'
-      if (rowIdx >= 3 && rowIdx <= 6) seatType = 'premium'
       if (rowIdx === 0) seatType = 'front'
+      if (isPremiumRow) seatType = 'premium' // Row G — back premium pairs
 
       seats.push({
         id: `seat-${showtimeId}-${row}-${seatNum}`,
