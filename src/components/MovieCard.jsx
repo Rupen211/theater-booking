@@ -27,31 +27,32 @@ export default function MovieCard({ movie, index = 0 }) {
       onClick={handleSelect}
     >
       {/* Poster area */}
-      <div className={`relative h-60 bg-gradient-to-br ${gradient} overflow-hidden`}>
-        <div className="absolute inset-0 bg-black/30" />
+      <div className={`relative h-72 bg-gradient-to-br ${gradient} overflow-hidden`}>
+        {/* Movie poster image */}
+        {movie.poster_url && (
+          <img
+            src={movie.poster_url}
+            alt={movie.title}
+            className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+            onError={(e) => { e.currentTarget.style.display = 'none' }}
+          />
+        )}
 
-        {/* Film grain texture */}
-        <div
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle, rgba(255,255,255,0.4) 1px, transparent 1px)',
-            backgroundSize: '8px 8px',
-          }}
-        />
+        {/* Dark gradient overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/40" />
 
         <div className="absolute inset-0 flex flex-col justify-between p-4">
           <div className="flex justify-between items-start">
             <span className="bg-cinema-gold text-black text-xs font-bold px-2 py-1 rounded">
               {movie.rating}
             </span>
-            <span className="text-white/60 text-xs bg-black/30 px-2 py-1 rounded">
+            <span className="text-white/80 text-xs bg-black/50 backdrop-blur-sm px-2 py-1 rounded">
               {movie.duration_minutes} min
             </span>
           </div>
           <div>
             <p className="text-white/70 text-xs uppercase tracking-widest mb-1">{movie.genre}</p>
-            <h3 className="text-white font-bold text-xl leading-tight group-hover:text-cinema-gold transition-colors">
+            <h3 className="text-white font-bold text-xl leading-tight group-hover:text-cinema-gold transition-colors drop-shadow-lg">
               {movie.title}
             </h3>
           </div>

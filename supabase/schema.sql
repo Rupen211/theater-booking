@@ -114,6 +114,9 @@ CREATE POLICY "bs_select" ON booking_seats   FOR SELECT USING (true);
 -- Seats update (mark as booked)
 CREATE POLICY "seats_update" ON seats FOR UPDATE USING (true);
 
+-- Showtimes update (decrement available_seats on booking)
+CREATE POLICY "showtimes_update" ON showtimes FOR UPDATE USING (true);
+
 -- ── Auto-create user profile on sign-up ────────────────────────────────────────
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$

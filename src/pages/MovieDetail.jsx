@@ -13,17 +13,9 @@ import {
 } from 'date-fns'
 import { useBooking } from '../context/BookingContext'
 import { useAuth } from '../context/AuthContext'
-import { MOCK_MOVIES, MOCK_SHOWTIMES } from '../data/mockData'
+import { supabase } from '../lib/supabase'
+import { POSTER_MAP, GRADIENT_MAP } from '../data/mockData'
 import LoginModal from '../components/LoginModal'
-
-const GRADIENTS = [
-  'from-amber-900 via-orange-900 to-red-950',
-  'from-red-900 via-rose-900 to-pink-950',
-  'from-slate-800 via-blue-900 to-indigo-950',
-  'from-indigo-900 via-purple-900 to-violet-950',
-  'from-gray-800 via-zinc-900 to-gray-950',
-  'from-teal-900 via-emerald-900 to-green-950',
-]
 
 function formatTime(time) {
   const [h, m] = time.split(':')
@@ -33,6 +25,15 @@ function formatTime(time) {
   return `${display}:${m} ${ampm}`
 }
 
+function enrichMovie(m) {
+  return {
+    ...m,
+    cast: m.cast_members ?? [],
+    poster_url: POSTER_MAP[m.title] ?? null,
+    gradient: GRADIENT_MAP[m.title] ?? 'from-gray-800 via-gray-900 to-gray-950',
+  }
+}
+
 export default function MovieDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -40,33 +41,42 @@ export default function MovieDetail() {
   const { user } = useAuth()
 
   const [movie, setMovieState] = useState(null)
+  const [showtimes, setShowtimes] = useState([])
+  const [loading, setLoading] = useState(true)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(null)
-  const [availableDates, setAvailableDates] = useState([])
   const [timesForDate, setTimesForDate] = useState([])
   const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
-    const found = MOCK_MOVIES.find((m) => m.id === id)
-    if (!found) { navigate('/'); return }
-    setMovieState(found)
-    setMovie(found)
+    if (!supabase) { navigate('/'); return }
 
-    const dates = [
-      ...new Set(
-        MOCK_SHOWTIMES.filter((st) => st.movie_id === id).map((st) => st.show_date)
-      ),
-    ]
-    setAvailableDates(dates)
+    async function fetchData() {
+      const [{ data: movieData }, { data: showtimeData }] = await Promise.all([
+        supabase.from('movies').select('*').eq('id', id).single(),
+        supabase.from('showtimes').select('*').eq('movie_id', id).order('show_date').order('show_time'),
+      ])
+
+      if (!movieData) { navigate('/'); return }
+
+      const enriched = enrichMovie(movieData)
+      setMovieState(enriched)
+      setMovie(enriched)
+      setShowtimes(showtimeData ?? [])
+      setLoading(false)
+    }
+
+    fetchData()
   }, [id])
 
   useEffect(() => {
     if (!selectedDate) return
-    const times = MOCK_SHOWTIMES
-      .filter((st) => st.movie_id === id && st.show_date === selectedDate)
-      .sort((a, b) => a.show_time.localeCompare(b.show_time))
-    setTimesForDate(times)
-  }, [selectedDate, id])
+    setTimesForDate(
+      showtimes
+        .filter((st) => st.show_date === selectedDate)
+        .sort((a, b) => a.show_time.localeCompare(b.show_time))
+    )
+  }, [selectedDate, showtimes])
 
   const handleTimeClick = (showtime) => {
     setShowtime(showtime, selectedDate)
@@ -77,23 +87,25 @@ export default function MovieDetail() {
     }
   }
 
-  // Calendar
+  const availableDates = [...new Set(showtimes.map((st) => st.show_date))]
+
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
   const calendarDays = eachDayOfInterval({ start: monthStart, end: monthEnd })
   const startPadding = getDay(monthStart)
 
-  const movieIndex = MOCK_MOVIES.findIndex((m) => m.id === id)
-  const gradient = GRADIENTS[movieIndex >= 0 ? movieIndex % GRADIENTS.length : 0]
+  const gradient = movie?.gradient ?? 'from-gray-800 via-gray-900 to-gray-950'
 
-  if (!movie) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-gray-400">Loading…</div>
+        <div className="text-gray-400 animate-pulse">Loading…</div>
       </div>
     )
   }
+
+  if (!movie) return null
 
   return (
     <div>
@@ -102,14 +114,23 @@ export default function MovieDetail() {
         <div className="absolute inset-0 bg-black/50" />
         <div className="relative z-10 max-w-7xl mx-auto px-4">
           <div className="flex flex-col md:flex-row gap-8 items-start">
-            {/* Poster placeholder */}
-            <div
-              className={`flex-shrink-0 w-40 h-56 rounded-xl border border-white/10 bg-gradient-to-br ${gradient} flex items-center justify-center shadow-2xl`}
-            >
-              <div className="text-center text-white opacity-70">
-                <div className="text-4xl mb-1">🎬</div>
-                <div className="text-xs font-bold">{movie.rating}</div>
-              </div>
+            {/* Movie poster */}
+            <div className={`flex-shrink-0 w-40 h-60 rounded-xl border border-white/10 bg-gradient-to-br ${gradient} overflow-hidden shadow-2xl`}>
+              {movie.poster_url ? (
+                <img
+                  src={movie.poster_url}
+                  alt={movie.title}
+                  className="w-full h-full object-cover object-center"
+                  onError={(e) => { e.currentTarget.style.display = 'none' }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-white/70">
+                  <div className="text-center">
+                    <div className="text-4xl mb-1">🎬</div>
+                    <div className="text-xs font-bold">{movie.rating}</div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Info */}
@@ -125,7 +146,7 @@ export default function MovieDetail() {
               <p className="text-gray-300 text-base max-w-2xl leading-relaxed mb-4">
                 {movie.description}
               </p>
-              {movie.cast && (
+              {movie.cast?.length > 0 && (
                 <p className="text-gray-400 text-sm">
                   <span className="text-gray-200 font-medium">Cast: </span>
                   {movie.cast.join(', ')}
@@ -143,7 +164,6 @@ export default function MovieDetail() {
           <div className="bg-cinema-card border border-cinema-border rounded-2xl p-6">
             <h2 className="text-white text-xl font-bold mb-6">Select a Date</h2>
 
-            {/* Month nav */}
             <div className="flex items-center justify-between mb-5">
               <button
                 onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
@@ -160,7 +180,6 @@ export default function MovieDetail() {
               </button>
             </div>
 
-            {/* Day headers */}
             <div className="grid grid-cols-7 mb-1">
               {DAYS.map((d) => (
                 <div key={d} className="text-center text-xs text-gray-600 font-medium py-1">
@@ -169,12 +188,10 @@ export default function MovieDetail() {
               ))}
             </div>
 
-            {/* Days */}
             <div className="grid grid-cols-7 gap-1">
               {Array.from({ length: startPadding }).map((_, i) => (
                 <div key={`pad-${i}`} />
               ))}
-
               {calendarDays.map((day) => {
                 const dateStr = format(day, 'yyyy-MM-dd')
                 const isAvailable = availableDates.includes(dateStr)
@@ -187,17 +204,12 @@ export default function MovieDetail() {
                 if (isSelected) {
                   cls += 'bg-cinema-gold text-black font-bold'
                 } else if (!isPastDay && isAvailable) {
-                  cls +=
-                    'border border-cinema-gold/30 text-white hover:bg-cinema-gold/20 cursor-pointer'
-                } else if (isPastDay) {
-                  cls += 'text-gray-700 cursor-not-allowed'
+                  cls += 'border border-cinema-gold/30 text-white hover:bg-cinema-gold/20 cursor-pointer'
                 } else {
                   cls += 'text-gray-700 cursor-not-allowed'
                 }
 
-                if (isToday(day) && !isSelected) {
-                  cls += ' ring-1 ring-cinema-gold/50'
-                }
+                if (isToday(day) && !isSelected) cls += ' ring-1 ring-cinema-gold/50'
 
                 return (
                   <button

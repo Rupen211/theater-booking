@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBooking } from '../context/BookingContext'
-import { generateSeats } from '../data/mockData'
+import { supabase } from '../lib/supabase'
 
 const SEAT_ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
 const PREMIUM_ROW = 'G'
@@ -35,18 +35,27 @@ export default function SeatSelection() {
   const { booking, setSeats, totalTickets } = useBooking()
   const [allSeats, setAllSeats] = useState([])
   const [selected, setSelected] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const seatedRef = useRef(false)
+  const fetchedRef = useRef(false)
   useEffect(() => {
     if (!booking.selectedShowtime) { navigate('/'); return }
-    if (seatedRef.current) return
-    seatedRef.current = true
+    if (fetchedRef.current) return
+    fetchedRef.current = true
 
-    const hash = booking.selectedShowtime.id
-      .split('')
-      .reduce((acc, c) => acc + c.charCodeAt(0), 0)
-    const bookedCount = 5 + (hash % 15)
-    setAllSeats(generateSeats(booking.selectedShowtime.id, bookedCount))
+    async function fetchSeats() {
+      if (!supabase) { setLoading(false); return }
+      const { data } = await supabase
+        .from('seats')
+        .select('*')
+        .eq('showtime_id', booking.selectedShowtime.id)
+        .order('seat_row')
+        .order('seat_number')
+      setAllSeats(data ?? [])
+      setLoading(false)
+    }
+
+    fetchSeats()
   }, [booking.selectedShowtime])
 
   if (!booking.selectedMovie || !booking.selectedShowtime) return null
@@ -114,19 +123,17 @@ export default function SeatSelection() {
 
   const renderPremiumRow = (row) => {
     const rowSeats = allSeats.filter((s) => s.seat_row === row)
-    // Group into pairs: [1,2], [3,4], [5,6], [7,8], [9,10]
     const pairs = []
     for (let i = 0; i < rowSeats.length; i += 2) {
       pairs.push(rowSeats.slice(i, i + 2))
     }
-    const leftPairs = pairs.slice(0, 2)   // pairs (1,2) and (3,4)
-    const rightPairs = pairs.slice(2)      // pairs (5,6) and (7,8)
+    const leftPairs = pairs.slice(0, 2)
+    const rightPairs = pairs.slice(2)
 
     return (
       <div key={row} className="flex items-center gap-2 mt-6 pt-4 border-t border-purple-900/40">
         <span className="w-5 text-right text-purple-400 text-xs font-mono font-bold select-none">{row}</span>
 
-        {/* Left pairs */}
         <div className="flex items-center gap-2">
           {leftPairs.map((pair, pIdx) => (
             <div key={pIdx} className="flex items-center gap-0.5">
@@ -144,10 +151,8 @@ export default function SeatSelection() {
           ))}
         </div>
 
-        {/* Aisle */}
         <div className="w-5" />
 
-        {/* Right pairs */}
         <div className="flex items-center gap-2">
           {rightPairs.map((pair, pIdx) => (
             <div key={pIdx} className="flex items-center gap-0.5">
@@ -201,16 +206,36 @@ export default function SeatSelection() {
         </div>
 
         {/* Rows */}
-        <div className="flex flex-col gap-2 items-center min-w-[500px]">
-          {SEAT_ROWS.map((row) =>
-            row === PREMIUM_ROW ? renderPremiumRow(row) : renderRegularRow(row)
-          )}
-
-          {/* Premium row label */}
-          <p className="text-purple-400/70 text-xs mt-2 tracking-widest uppercase">
-            ★ Premium Pairs — Row G
-          </p>
-        </div>
+        {loading ? (
+          <div className="flex flex-col gap-2 items-center min-w-[500px] animate-pulse">
+            {SEAT_ROWS.map((row) => (
+              <div key={row} className="flex items-center gap-2">
+                <div className="w-5 h-4 bg-gray-800 rounded" />
+                <div className="flex gap-0.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="w-9 h-9 bg-gray-800 rounded-md" />
+                  ))}
+                </div>
+                <div className="w-5" />
+                <div className="flex gap-0.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="w-9 h-9 bg-gray-800 rounded-md" />
+                  ))}
+                </div>
+                <div className="w-5 h-4 bg-gray-800 rounded" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 items-center min-w-[500px]">
+            {SEAT_ROWS.map((row) =>
+              row === PREMIUM_ROW ? renderPremiumRow(row) : renderRegularRow(row)
+            )}
+            <p className="text-purple-400/70 text-xs mt-2 tracking-widest uppercase">
+              ★ Premium Pairs — Row G
+            </p>
+          </div>
+        )}
 
         {/* Legend */}
         <div className="flex flex-wrap justify-center gap-5 mt-8 pt-6 border-t border-cinema-border text-xs text-gray-500">

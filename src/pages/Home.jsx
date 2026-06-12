@@ -1,7 +1,40 @@
-import { MOCK_MOVIES } from '../data/mockData'
+import { useState, useEffect } from 'react'
 import MovieCard from '../components/MovieCard'
+import { supabase } from '../lib/supabase'
+import { POSTER_MAP, GRADIENT_MAP } from '../data/mockData'
+
+function enrichMovie(m) {
+  return {
+    ...m,
+    cast: m.cast_members ?? [],
+    poster_url: POSTER_MAP[m.title] ?? null,
+    gradient: GRADIENT_MAP[m.title] ?? 'from-gray-800 via-gray-900 to-gray-950',
+  }
+}
 
 export default function Home() {
+  const [movies, setMovies] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    async function fetchMovies() {
+      if (!supabase) {
+        setError('Database not configured. Please check your environment variables.')
+        setLoading(false)
+        return
+      }
+      const { data, error } = await supabase.from('movies').select('*').order('title')
+      if (error) {
+        setError('Failed to load movies. Please try again later.')
+      } else {
+        setMovies((data ?? []).map(enrichMovie))
+      }
+      setLoading(false)
+    }
+    fetchMovies()
+  }, [])
+
   return (
     <div>
       {/* Hero */}
@@ -9,8 +42,7 @@ export default function Home() {
         <div
           className="absolute inset-0 opacity-[0.04]"
           style={{
-            backgroundImage:
-              'radial-gradient(circle, #f59e0b 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(circle, #f59e0b 1px, transparent 1px)',
             backgroundSize: '36px 36px',
           }}
         />
@@ -42,11 +74,38 @@ export default function Home() {
           <div className="w-1 h-8 bg-cinema-gold rounded-full" />
           <h2 className="text-white text-3xl font-bold">Now Showing</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {MOCK_MOVIES.map((movie, i) => (
-            <MovieCard key={movie.id} movie={movie} index={i} />
-          ))}
-        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-cinema-card border border-cinema-border rounded-xl overflow-hidden animate-pulse">
+                <div className="h-72 bg-gray-800" />
+                <div className="p-4 space-y-3">
+                  <div className="h-4 bg-gray-800 rounded w-3/4" />
+                  <div className="h-3 bg-gray-800 rounded w-full" />
+                  <div className="h-3 bg-gray-800 rounded w-5/6" />
+                  <div className="h-10 bg-gray-800 rounded mt-4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-20">
+            <div className="text-4xl mb-4">⚠️</div>
+            <p className="text-gray-400">{error}</p>
+          </div>
+        ) : movies.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-4xl mb-4">🎬</div>
+            <p className="text-gray-400">No movies available right now.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {movies.map((movie, i) => (
+              <MovieCard key={movie.id} movie={movie} index={i} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Features */}

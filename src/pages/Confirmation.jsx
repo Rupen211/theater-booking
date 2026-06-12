@@ -59,7 +59,7 @@ export default function Confirmation() {
         const { data: bookingRow } = await supabase
           .from('bookings')
           .insert({
-            showtime_id: null, // mock showtimes have no UUID in DB
+            showtime_id: booking.selectedShowtime.id,
             user_id: user?.id ?? null,
             guest_email: booking.guestInfo?.email ?? null,
             guest_name: booking.guestInfo?.name ?? null,
@@ -71,6 +71,7 @@ export default function Confirmation() {
           .single()
 
         if (bookingRow?.id) {
+          // Insert ticket type breakdown
           const ticketRows = Object.entries(booking.tickets)
             .filter(([, qty]) => qty > 0)
             .map(([type, qty]) => ({
@@ -80,6 +81,27 @@ export default function Confirmation() {
               price_per_ticket: TICKET_PRICES[type],
             }))
           await supabase.from('booking_tickets').insert(ticketRows)
+
+          // Insert selected seats and mark them as booked
+          if (booking.selectedSeats.length > 0) {
+            const seatRows = booking.selectedSeats.map((s) => ({
+              booking_id: bookingRow.id,
+              seat_id: s.id,
+            }))
+            await supabase.from('booking_seats').insert(seatRows)
+
+            await supabase
+              .from('seats')
+              .update({ is_booked: true })
+              .in('id', booking.selectedSeats.map((s) => s.id))
+
+            await supabase
+              .from('showtimes')
+              .update({
+                available_seats: booking.selectedShowtime.available_seats - booking.selectedSeats.length,
+              })
+              .eq('id', booking.selectedShowtime.id)
+          }
         }
       }
     } catch {
