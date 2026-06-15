@@ -3,7 +3,7 @@ import oppenheimerPoster from '../source_files/Oppenheimer.webp'
 import batmanPoster from '../source_files/The_Batman.webp'
 import interstellarPoster from '../source_files/Interstellar.webp'
 import missionImpossiblePoster from '../source_files/MI_Dead_reckoning.webp'
-import poorThingsPoster from '../source_files/Poor_things_v01.jpg'
+import poorThingsPoster from '../source_files/Poor_things.webp'
 
 export const POSTER_MAP = {
   'Dune: Part Two': dunePoster,
@@ -28,3 +28,6 @@ export const TICKET_PRICES = {
   student: 8.5,
   senior: 9.5,
 }
+
+export const PREMIUM_ROW = 'G'
+export const PREMIUM_SURCHARGE = 25

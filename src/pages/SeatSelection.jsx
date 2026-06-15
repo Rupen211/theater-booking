@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBooking } from '../context/BookingContext'
 import { supabase } from '../lib/supabase'
+import { PREMIUM_ROW, PREMIUM_SURCHARGE } from '../data/movieAssets'
 
 const SEAT_ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
-const PREMIUM_ROW = 'G'
 
 function seatClass(seat, isSelected) {
   const base =
@@ -77,6 +77,8 @@ export default function SeatSelection() {
   }
 
   const remaining = totalTickets - selected.length
+  const premiumCount = selected.filter((s) => s.seat_row === PREMIUM_ROW).length
+  const premiumSurchargeTotal = premiumCount * PREMIUM_SURCHARGE
 
   const renderRegularRow = (row) => {
     const rowSeats = allSeats.filter((s) => s.seat_row === row)
@@ -234,6 +236,9 @@ export default function SeatSelection() {
             <p className="text-purple-400/70 text-xs mt-2 tracking-widest uppercase">
               ★ Premium Pairs — Row G
             </p>
+            <p className="text-purple-300/60 text-xs mt-1">
+              Row G seats carry a <span className="text-purple-300 font-semibold">£{PREMIUM_SURCHARGE} premium surcharge</span> per seat
+            </p>
           </div>
         )}
 
@@ -265,15 +270,24 @@ export default function SeatSelection() {
       {/* Selected seats chips */}
       {selected.length > 0 && (
         <div className="mt-4 bg-cinema-card border border-cinema-border rounded-xl p-4">
-          <p className="text-gray-400 text-sm mb-2">
-            Selected: {selected.length}/{totalTickets}
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-gray-400 text-sm">Selected: {selected.length}/{totalTickets}</p>
+            {premiumSurchargeTotal > 0 && (
+              <p className="text-purple-300 text-xs font-semibold">
+                + £{premiumSurchargeTotal.toFixed(2)} premium surcharge
+              </p>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
             {selected.map((s) => (
               <button
                 key={s.id}
                 onClick={() => toggleSeat(s)}
-                className="bg-cinema-gold text-black text-xs font-bold px-3 py-1 rounded-full hover:bg-red-500 hover:text-white transition-colors"
+                className={`text-xs font-bold px-3 py-1 rounded-full hover:bg-red-500 hover:text-white transition-colors ${
+                  s.seat_row === PREMIUM_ROW
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-cinema-gold text-black'
+                }`}
                 title="Click to deselect"
               >
                 {s.seat_row}{s.seat_number} ×

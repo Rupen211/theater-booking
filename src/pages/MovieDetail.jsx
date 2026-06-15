@@ -14,7 +14,7 @@ import {
 import { useBooking } from '../context/BookingContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { POSTER_MAP, GRADIENT_MAP } from '../data/mockData'
+import { POSTER_MAP, GRADIENT_MAP } from '../data/movieAssets'
 import LoginModal from '../components/LoginModal'
 
 function formatTime(time) {

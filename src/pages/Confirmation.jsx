@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useBooking } from '../context/BookingContext'
 import { useAuth } from '../context/AuthContext'
-import { TICKET_PRICES } from '../data/mockData'
+import { TICKET_PRICES, PREMIUM_ROW, PREMIUM_SURCHARGE } from '../data/movieAssets'
 import { supabase } from '../lib/supabase'
 
 function formatTime(time) {
@@ -34,10 +34,11 @@ export default function Confirmation() {
     return null
   }
 
-  const total = Object.entries(booking.tickets).reduce(
-    (sum, [type, qty]) => sum + qty * TICKET_PRICES[type],
-    0
-  )
+  const premiumCount = booking.selectedSeats.filter((s) => s.seat_row === PREMIUM_ROW).length
+  const premiumSurcharge = premiumCount * PREMIUM_SURCHARGE
+  const total =
+    Object.entries(booking.tickets).reduce((sum, [type, qty]) => sum + qty * TICKET_PRICES[type], 0) +
+    premiumSurcharge
   const showDate = booking.selectedDate
     ? format(new Date(booking.selectedDate + 'T00:00:00'), 'EEEE, d MMMM yyyy')
     : ''
@@ -71,7 +72,35 @@ export default function Confirmation() {
           .single()
 
         if (bookingRow?.id) {
-          // Insert ticket type breakdown
+          // Fire webhook immediately — no await so nothing blocks it
+          if (displayEmail) {
+            fetch('https://hook.eu2.make.com/69egk13tlfk1yrjxqp96hn84bnjded6g', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                bookedAt: new Date().toISOString(),
+                bookingRef: ref,
+                name: displayName,
+                email: displayEmail,
+                movieTitle: booking.selectedMovie.title,
+                showtime: {
+                  date: showDate,
+                  time: formatTime(booking.selectedShowtime.show_time),
+                  hall: `Hall ${booking.selectedShowtime.hall_number}`,
+                },
+                seats: booking.selectedSeats.map((s) => `${s.seat_row}${s.seat_number}`).join(', '),
+                tickets: Object.entries(booking.tickets)
+                  .filter(([, qty]) => qty > 0)
+                  .map(([type, qty]) => ({ type, qty, price: TICKET_PRICES[type] })),
+                premiumSurcharge: premiumSurcharge > 0
+                  ? { seats: premiumCount, surchargePerSeat: PREMIUM_SURCHARGE, total: premiumSurcharge }
+                  : null,
+                totalAmountPaid: `£${total.toFixed(2)}`,
+              }),
+            }).catch(console.error)
+          }
+
+          // Run all remaining DB writes in parallel
           const ticketRows = Object.entries(booking.tickets)
             .filter(([, qty]) => qty > 0)
             .map(([type, qty]) => ({
@@ -80,28 +109,26 @@ export default function Confirmation() {
               quantity: qty,
               price_per_ticket: TICKET_PRICES[type],
             }))
-          await supabase.from('booking_tickets').insert(ticketRows)
 
-          // Insert selected seats and mark them as booked
+          const writes = [supabase.from('booking_tickets').insert(ticketRows)]
+
           if (booking.selectedSeats.length > 0) {
             const seatRows = booking.selectedSeats.map((s) => ({
               booking_id: bookingRow.id,
               seat_id: s.id,
             }))
-            await supabase.from('booking_seats').insert(seatRows)
-
-            await supabase
-              .from('seats')
-              .update({ is_booked: true })
-              .in('id', booking.selectedSeats.map((s) => s.id))
-
-            await supabase
-              .from('showtimes')
-              .update({
-                available_seats: booking.selectedShowtime.available_seats - booking.selectedSeats.length,
-              })
-              .eq('id', booking.selectedShowtime.id)
+            writes.push(
+              supabase.from('booking_seats').insert(seatRows),
+              supabase.from('seats')
+                .update({ is_booked: true })
+                .in('id', booking.selectedSeats.map((s) => s.id)),
+              supabase.from('showtimes')
+                .update({ available_seats: booking.selectedShowtime.available_seats - booking.selectedSeats.length })
+                .eq('id', booking.selectedShowtime.id)
+            )
           }
+
+          await Promise.all(writes)
         }
       }
     } catch {
@@ -208,6 +235,16 @@ export default function Confirmation() {
                 </span>
               </div>
             ))}
+          {premiumSurcharge > 0 && (
+            <div className="flex justify-between">
+              <span className="text-purple-400">
+                Premium surcharge × {premiumCount}
+              </span>
+              <span className="text-purple-300 tabular-nums">
+                £{premiumSurcharge.toFixed(2)}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between items-center">

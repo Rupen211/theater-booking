@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useBooking } from '../context/BookingContext'
-import { TICKET_PRICES } from '../data/mockData'
+import { TICKET_PRICES } from '../data/movieAssets'
 
 function formatTime(time) {
   const [h, m] = time.split(':')

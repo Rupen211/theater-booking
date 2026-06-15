@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import MovieCard from '../components/MovieCard'
 import { supabase } from '../lib/supabase'
-import { POSTER_MAP, GRADIENT_MAP } from '../data/mockData'
+import { POSTER_MAP, GRADIENT_MAP } from '../data/movieAssets'
 
 function enrichMovie(m) {
   return {
