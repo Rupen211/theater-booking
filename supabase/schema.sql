@@ -118,6 +118,22 @@ CREATE POLICY "seats_update" ON seats FOR UPDATE USING (true);
 -- Showtimes update (decrement available_seats on booking)
 CREATE POLICY "showtimes_update" ON showtimes FOR UPDATE USING (true);
 
+-- ── Table privileges ───────────────────────────────────────────────────────────
+-- RLS policies only filter rows AFTER Postgres confirms the role has base
+-- table access — they don't grant that access themselves. Tables created via
+-- the SQL editor (unlike the Table Editor UI) get no privileges for anon /
+-- authenticated by default, so without these grants every query 42501s
+-- ("permission denied for table ...") before RLS is ever evaluated.
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+
+GRANT SELECT                 ON movies          TO anon, authenticated;
+GRANT SELECT, UPDATE         ON showtimes       TO anon, authenticated;
+GRANT SELECT, UPDATE         ON seats           TO anon, authenticated;
+GRANT SELECT, INSERT         ON bookings        TO anon, authenticated;
+GRANT SELECT, INSERT         ON booking_tickets TO anon, authenticated;
+GRANT SELECT, INSERT         ON booking_seats   TO anon, authenticated;
+GRANT SELECT, UPDATE         ON users           TO authenticated;
+
 -- ── Auto-create user profile on sign-up ────────────────────────────────────────
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
