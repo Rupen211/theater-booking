@@ -1,0 +1,96 @@
+CineBook — Supabase Recreation Setup Guide
+===========================================
+Use this if you need to stand the app up again on a brand-new Supabase
+project / account (e.g. the old project is being retired or you're moving
+to a different Supabase org).
+
+
+REQUIRED — for the app itself to function
+------------------------------------------
+
+1. Create the project
+   New org/account -> New project on supabase.com.
+   Note the DB password somewhere safe.
+
+2. Get credentials, update env
+   Settings -> API -> copy "Project URL" and "anon public" key into
+   .env.local:
+
+     VITE_SUPABASE_URL=https://<new-ref>.supabase.co
+     VITE_SUPABASE_ANON_KEY=<new-anon-key>
+
+   Restart `npm run dev` afterwards (Vite only reads .env* at boot).
+
+3. Run the SQL, in order
+   SQL Editor -> paste and run supabase/schema.sql first, then
+   supabase/seed.sql.
+     - schema.sql creates all tables, RLS policies, and the
+       handle_new_user auth trigger.
+     - seed.sql adds the 6 sample movies, showtimes, and generates
+       all their seats. Safe to re-run (uses ON CONFLICT DO NOTHING).
+
+4. Configure Auth URLs
+   Authentication -> URL Configuration: set "Site URL" to wherever the
+   app runs (e.g. http://localhost:5173 for dev, your real domain for
+   prod) and add it to "Redirect URLs".
+   This matters because Profile.jsx calls updateEmail / updatePassword,
+   which send confirmation links that redirect back to this URL — if
+   it's unset or wrong, those links 404 or bounce to localhost:3000.
+
+5. Rebuild / redeploy the frontend
+   If it's hosted (Netlify/Vercel/etc.), update the env vars there too
+   and trigger a rebuild — Vite bakes VITE_* vars in at build time.
+
+That's the complete list for the booking flow, seat selection,
+sign-up/sign-in, and booking history to work.
+
+
+OPTIONAL — only if you also want the email pipeline
+-----------------------------------------------------
+
+Important: the Supabase Edge Function (supabase/functions/send-booking-email)
+is NOT currently wired up. Nothing in src/ calls it (no functions.invoke,
+no reference to "send-booking-email" anywhere).
+
+What actually fires on booking confirmation is a hardcoded webhook in
+Confirmation.jsx:
+
+  fetch('https://hook.eu2.make.com/69egk13tlfk1yrjxqp96hn84bnjded6g', ...)
+
+That's a Make.com scenario, completely outside Supabase. So:
+
+  - If that Make.com scenario is staying alive (same Make account, same
+    URL) -> recreating Supabase doesn't touch it at all, nothing to do.
+
+  - If you're also retiring/replacing that Make.com account -> you'll
+    need a new scenario and to swap that URL in Confirmation.jsx.
+
+  - If you actually want supabase/functions/send-booking-email to be the
+    thing that sends email (via Resend) instead of Make.com, that
+    requires code changes, not just infra:
+      1. supabase link --project-ref <new-ref>
+      2. supabase functions deploy send-booking-email
+      3. supabase secrets set RESEND_API_KEY=<your-key>
+      4. Verify a sending domain in Resend
+      5. Add an actual call to the function from Confirmation.jsx —
+         right now it would deploy successfully and just never run.
+
+Treat the email question as a separate decision from the database
+migration — the app works end-to-end without it.
+
+
+DATABASE TABLES (reference)
+------------------------------
+  users            Extended profiles, linked to auth.users
+  movies           Film catalogue
+  showtimes        Dates + times per movie
+  seats            Per-showtime seat map
+  bookings         Booking records (user or guest)
+  booking_tickets  Ticket type breakdown per booking
+  booking_seats    Which seats belong to a booking
+
+Note: the `users` table, its RLS policies, and the handle_new_user
+trigger are created by schema.sql but not currently queried by the
+app — AuthContext.jsx / Profile.jsx store name/phone/address in
+Supabase Auth's user_metadata via auth.updateUser(), not this table.
+Harmless to keep; safe to ignore if auditing what's "live".
