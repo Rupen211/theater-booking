@@ -82,7 +82,8 @@ migration — the app works end-to-end without it.
 
 DATABASE TABLES (reference)
 ------------------------------
-  users            Extended profiles, linked to auth.users
+  users            Extended profiles, linked to auth.users — full_name,
+                    mobile_number, address
   movies           Film catalogue
   showtimes        Dates + times per movie
   seats            Per-showtime seat map
@@ -90,8 +91,14 @@ DATABASE TABLES (reference)
   booking_tickets  Ticket type breakdown per booking
   booking_seats    Which seats belong to a booking
 
-Note: the `users` table, its RLS policies, and the handle_new_user
-trigger are created by schema.sql but not currently queried by the
-app — AuthContext.jsx / Profile.jsx store name/phone/address in
-Supabase Auth's user_metadata via auth.updateUser(), not this table.
-Harmless to keep; safe to ignore if auditing what's "live".
+Note: the `users` table is the source of truth for mobile_number and
+address. handle_new_user populates full_name + mobile_number from the
+signup form's metadata the moment an account is created (address isn't
+collected at signup, so it starts NULL). After that, AuthContext.jsx's
+updateProfile() keeps it in sync — every "Save Changes" on the Profile
+page writes full_name/mobile_number/address into this table (it also
+still mirrors full_name/phone/address into Supabase Auth's
+user_metadata, so nothing that reads user_metadata elsewhere breaks).
+
+Phone number is a required field on both sign-up forms (SignIn.jsx and
+LoginModal.jsx) — an account can't be created without one.
