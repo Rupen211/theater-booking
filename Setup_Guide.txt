@@ -19,7 +19,8 @@ REQUIRED — for the app itself to function
      VITE_SUPABASE_URL=https://<new-ref>.supabase.co
      VITE_SUPABASE_ANON_KEY=<new-anon-key>
 
-   Restart `npm run dev` afterwards (Vite only reads .env* at boot).
+   Restart 'npm run dev' afterwards (Vite only reads .env* at boot).
+   Note: ".env.local" file is required to run the web app.
 
 3. Run the SQL, in order
    SQL Editor -> paste and run supabase/schema.sql first, then
