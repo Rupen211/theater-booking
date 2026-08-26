@@ -37,12 +37,12 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  const signUp = async (email, password, fullName) => {
+  const signUp = async (email, password, fullName, phone) => {
     if (!supabase) throw new Error('Supabase is not configured. Add your credentials to .env')
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName, phone } },
     })
     if (error) throw error
     return data
@@ -59,6 +59,13 @@ export function AuthProvider({ children }) {
       data: { full_name, phone, address },
     })
     if (error) throw error
+
+    const { error: profileError } = await supabase
+      .from('users')
+      .update({ full_name, mobile_number: phone, address })
+      .eq('id', data.user.id)
+    if (profileError) throw profileError
+
     setUser(data.user)
   }
 

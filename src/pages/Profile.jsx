@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import BookingDetailModal from '../components/BookingDetailModal'
 
 function Section({ title, children }) {
   return (
@@ -55,6 +56,7 @@ export default function Profile() {
   // Booking history
   const [bookings, setBookings] = useState([])
   const [bookingsLoading, setBookingsLoading] = useState(false)
+  const [selectedBooking, setSelectedBooking] = useState(null)
 
   useEffect(() => {
     if (!user) { navigate('/signin'); return }
@@ -71,7 +73,12 @@ export default function Profile() {
     setBookingsLoading(true)
     const { data } = await supabase
       .from('bookings')
-      .select('*, booking_tickets(*)')
+      .select(`
+        *,
+        booking_tickets(*),
+        booking_seats(*, seats(seat_row, seat_number, seat_type)),
+        showtimes(show_date, show_time, hall_number, movies(title))
+      `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
     setBookings(data || [])
@@ -267,13 +274,20 @@ export default function Profile() {
         ) : (
           <div className="flex flex-col gap-4">
             {bookings.map((b) => (
-              <div key={b.id} className="bg-cinema-darker border border-cinema-border rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
+              <button
+                key={b.id}
+                onClick={() => setSelectedBooking(b)}
+                className="text-left bg-cinema-darker border border-cinema-border hover:border-cinema-gold/50 rounded-xl p-4 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center justify-between mb-1">
                   <span className="text-cinema-gold font-bold tracking-widest text-sm">{b.booking_reference}</span>
                   <span className="text-xs text-gray-500">
                     {b.created_at ? format(new Date(b.created_at), 'd MMM yyyy') : ''}
                   </span>
                 </div>
+                {b.showtimes?.movies?.title && (
+                  <p className="text-white text-sm font-semibold mb-2">{b.showtimes.movies.title}</p>
+                )}
                 {b.booking_tickets?.length > 0 && (
                   <div className="flex flex-wrap gap-3 mb-2">
                     {b.booking_tickets.map((t) => (
@@ -287,11 +301,15 @@ export default function Profile() {
                   <span className="text-xs text-green-400 capitalize">{b.status}</span>
                   <span className="text-white font-bold tabular-nums">£{Number(b.total_price).toFixed(2)}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
       </Section>
+
+      {selectedBooking && (
+        <BookingDetailModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
+      )}
     </div>
   )
 }

@@ -8,6 +8,7 @@ export default function LoginModal({ onClose }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
   const [guestName, setGuestName] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -40,7 +41,7 @@ export default function LoginModal({ onClose }) {
     setLoading(true)
     clearError()
     try {
-      await signUp(email, password, fullName)
+      await signUp(email, password, fullName, phone)
       setBookingType('user')
       onClose()
       navigate('/tickets')
@@ -149,6 +150,7 @@ export default function LoginModal({ onClose }) {
             <form onSubmit={handleRegister} className="flex flex-col gap-4">
               <input type="text" placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} required />
               <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} required />
+              <input type="tel" placeholder="Phone number" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} required />
               <input type="password" placeholder="Password (min. 6 characters)" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} minLength={6} required />
               <button type="submit" disabled={loading} className="bg-cinema-gold hover:bg-cinema-gold-dark disabled:opacity-50 text-black font-semibold py-3 rounded-xl transition-colors">
                 {loading ? 'Creating account…' : 'Create Account'}

@@ -8,10 +8,12 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ── Users (mirrors auth.users) ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
-  id        UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  email     TEXT NOT NULL,
-  full_name TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  id             UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  email          TEXT NOT NULL,
+  full_name      TEXT,
+  mobile_number  TEXT,
+  address        TEXT,
+  created_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ── Movies ─────────────────────────────────────────────────────────────────────
@@ -100,11 +102,13 @@ CREATE POLICY "seats_public_read"     ON seats     FOR SELECT USING (true);
 CREATE POLICY "users_own_read"   ON users FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "users_own_update" ON users FOR UPDATE USING (auth.uid() = id);
 
--- Bookings — anyone can insert (guests), owners can read theirs
+-- Bookings — anyone can insert (guests), only the signed-in owner can read.
+-- Guest bookings (user_id IS NULL) are deliberately NOT readable via the
+-- client — there is no way to scope that to "just the guest who made it"
+-- under RLS, so allowing it would make every guest booking's name/email/
+-- price/reference public to anyone with the anon key.
 CREATE POLICY "bookings_insert" ON bookings FOR INSERT WITH CHECK (true);
-CREATE POLICY "bookings_select" ON bookings FOR SELECT USING (
-  auth.uid() = user_id OR user_id IS NULL
-);
+CREATE POLICY "bookings_select" ON bookings FOR SELECT USING (auth.uid() = user_id);
 
 -- Booking tickets / seats — open for insert/select (booking flow)
 CREATE POLICY "bt_insert" ON booking_tickets FOR INSERT WITH CHECK (true);
@@ -138,11 +142,13 @@ GRANT SELECT, UPDATE         ON users           TO authenticated;
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  INSERT INTO public.users (id, email, full_name)
+  INSERT INTO public.users (id, email, full_name, mobile_number, address)
   VALUES (
     NEW.id,
     NEW.email,
-    NEW.raw_user_meta_data->>'full_name'
+    NEW.raw_user_meta_data->>'full_name',
+    NEW.raw_user_meta_data->>'phone',
+    NEW.raw_user_meta_data->>'address'
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
