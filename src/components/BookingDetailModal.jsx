@@ -1,4 +1,5 @@
 import { format } from 'date-fns'
+import { POSTER_MAP, GRADIENT_MAP } from '../data/movieAssets'
 
 function formatTime(time) {
   const [h, m] = time.split(':')
@@ -13,6 +14,8 @@ export default function BookingDetailModal({ booking, onClose }) {
 
   const showtime = booking.showtimes
   const movieTitle = showtime?.movies?.title || 'Unknown Film'
+  const posterUrl = POSTER_MAP[movieTitle] ?? null
+  const gradient = GRADIENT_MAP[movieTitle] ?? 'from-gray-800 via-gray-900 to-gray-950'
   const showDate = showtime?.show_date
     ? format(new Date(showtime.show_date + 'T00:00:00'), 'EEEE, d MMMM yyyy')
     : '—'
@@ -42,10 +45,19 @@ export default function BookingDetailModal({ booking, onClose }) {
           </svg>
         </button>
 
-        <h2 className="text-white text-2xl font-bold mb-1 pr-8">{movieTitle}</h2>
-        <p className="text-gray-500 text-xs mb-5">
-          Booked {booking.created_at ? format(new Date(booking.created_at), 'd MMM yyyy, HH:mm') : ''}
-        </p>
+        <div className="flex items-start gap-4 mb-5 pr-8">
+          <div className={`flex-shrink-0 w-16 h-24 rounded-lg border border-white/10 bg-gradient-to-br ${gradient} overflow-hidden`}>
+            {posterUrl && (
+              <img src={posterUrl} alt={movieTitle} className="w-full h-full object-cover" />
+            )}
+          </div>
+          <div>
+            <h2 className="text-white text-2xl font-bold mb-1">{movieTitle}</h2>
+            <p className="text-gray-500 text-xs">
+              Booked {booking.created_at ? format(new Date(booking.created_at), 'd MMM yyyy, HH:mm') : ''}
+            </p>
+          </div>
+        </div>
 
         {/* Booking reference */}
         <div className="bg-cinema-gold/10 border border-cinema-gold/25 rounded-xl p-4 mb-5 text-center">
