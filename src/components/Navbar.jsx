@@ -49,6 +49,12 @@ export default function Navbar() {
                 >
                   My Account
                 </Link>
+                <Link
+                  to="/bookings"
+                  className="text-gray-300 hover:text-cinema-gold transition-colors text-sm font-medium"
+                >
+                  My Bookings
+                </Link>
                 {canViewUsers && (
                   <Link
                     to="/users"
@@ -97,6 +103,7 @@ export default function Navbar() {
             {user ? (
               <>
                 <Link to="/profile" onClick={() => setMenuOpen(false)} className="text-gray-300 hover:text-cinema-gold px-2 py-1 text-sm">My Account</Link>
+                <Link to="/bookings" onClick={() => setMenuOpen(false)} className="text-gray-300 hover:text-cinema-gold px-2 py-1 text-sm">My Bookings</Link>
                 {canViewUsers && (
                   <Link to="/users" onClick={() => setMenuOpen(false)} className="text-gray-300 hover:text-cinema-gold px-2 py-1 text-sm">Users</Link>
                 )}
