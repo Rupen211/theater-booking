@@ -42,8 +42,44 @@ REQUIRED — for the app itself to function
    If it's hosted (Netlify/Vercel/etc.), update the env vars there too
    and trigger a rebuild — Vite bakes VITE_* vars in at build time.
 
+6. Promote your first admin
+   Every user starts as permission = 'user' (the column's default) — on
+   a brand-new project nobody is an admin yet, so the "Users" nav link
+   / /users page stays permanently inaccessible until you do this once,
+   manually, in the SQL Editor:
+
+     UPDATE users SET permission = 'admin' WHERE email = 'you@example.com';
+
+   Do this AFTER signing up that account at least once (the row has to
+   exist first). Anyone promoted this way can then use the Users page
+   to see the full user list — there's currently no in-app way to
+   promote further admins, it's SQL-only by design.
+
+7. Deploy the admin edge functions
+   Unlike send-booking-email (see OPTIONAL section below), these three ARE
+   required — the Users page loads fine without them, but its Delete,
+   Add User, and permission-dropdown controls will all fail. No secrets
+   to configure either; all three use SUPABASE_SERVICE_ROLE_KEY, which
+   every edge function gets automatically.
+
+     supabase link --project-ref <new-ref>   (skip if already linked)
+     supabase functions deploy delete-user
+     supabase functions deploy create-user
+     supabase functions deploy update-permission
+
+   No CLI installed? Paste each function's supabase/functions/<name>/
+   index.ts into Dashboard -> Edge Functions -> Deploy a new function
+   instead, using the exact folder name (delete-user / create-user /
+   update-permission) as the function name.
+
+   Note: deleting a user cascades to permanently delete all of their
+   bookings, tickets, and seat records too (bookings.user_id is
+   ON DELETE CASCADE) — there's no way to delete the account but keep
+   its booking history.
+
 That's the complete list for the booking flow, seat selection,
-sign-up/sign-in, and booking history to work.
+sign-up/sign-in, booking history, and the admin Users page (view, add,
+delete) to work.
 
 
 OPTIONAL — only if you also want the email pipeline
@@ -83,7 +119,8 @@ migration — the app works end-to-end without it.
 DATABASE TABLES (reference)
 ------------------------------
   users            Extended profiles, linked to auth.users — full_name,
-                    mobile_number, address
+                    mobile_number, address, permission
+                    ('user' / 'staff' / 'admin')
   movies           Film catalogue
   showtimes        Dates + times per movie
   seats            Per-showtime seat map
@@ -102,3 +139,42 @@ user_metadata, so nothing that reads user_metadata elsewhere breaks).
 
 Phone number is a required field on both sign-up forms (SignIn.jsx and
 LoginModal.jsx) — an account can't be created without one.
+
+Admin / staff / permission: permission defaults to 'user' for every
+signup. The Users page (src/pages/Users.jsx) has two separate gates,
+both from AuthContext:
+  - canViewUsers (admin OR staff) controls whether the nav link shows
+    and whether the page lets you in at all.
+  - isAdmin (admin only) controls whether you see the Add User button,
+    the Delete links, and the permission dropdown — staff get a
+    read-only view: the full list, plus the search box and the
+    All/User/Staff/Admin filter tabs, nothing that changes data.
+Two things enforce the *view* access at the database level, not just
+the UI:
+  - is_staff_or_admin() is a SECURITY DEFINER function checking the
+    caller's own permission (admin or staff); a
+    "users_staff_admin_read_all" RLS policy USING (is_staff_or_admin())
+    is what actually lets that SELECT return every row (everyone else's
+    SELECT only ever returns their own row). is_admin() (admin only)
+    also still exists, used only inside the edge functions below.
+  - The UPDATE grant on users is column-scoped to
+    (full_name, mobile_number, address) — deliberately excluding
+    permission — so no signed-in user can self-promote via a direct
+    API call, even though the users_own_update RLS policy's row check
+    alone wouldn't stop them. See step 6 above for granting the first
+    admin (SQL-only, no in-app way to do it).
+
+Add / Delete / change permission (Users page): all three go through
+edge functions (supabase/functions/create-user, delete-user,
+update-permission — see step 7 above), never directly from the
+browser, because creating/deleting an auth.users row — and setting
+permission on any row but your own — needs the service-role key, which
+must never reach client-side code. Each function re-checks the caller
+is really an admin itself (querying users.permission with the
+service-role key — that's why it needs the SELECT/UPDATE grants added
+in schema.sql), rather than trusting anything the client claims about
+who's calling. update-permission also blocks an admin from changing
+their own permission, so they can't accidentally lock themselves out.
+create-user invites by email (auth.admin.inviteUserByEmail) rather
+than setting a password directly, so it also depends on this project's
+email delivery working.

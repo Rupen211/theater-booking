@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Navbar() {
-  const { user, signOut } = useAuth()
+  const { user, canViewUsers, signOut } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -49,6 +49,14 @@ export default function Navbar() {
                 >
                   My Account
                 </Link>
+                {canViewUsers && (
+                  <Link
+                    to="/users"
+                    className="text-gray-300 hover:text-cinema-gold transition-colors text-sm font-medium"
+                  >
+                    Users
+                  </Link>
+                )}
                 <button
                   onClick={handleSignOut}
                   className="text-sm border border-cinema-border hover:border-red-700 hover:text-red-400 text-gray-300 px-4 py-2 rounded-lg transition-colors"
@@ -89,6 +97,9 @@ export default function Navbar() {
             {user ? (
               <>
                 <Link to="/profile" onClick={() => setMenuOpen(false)} className="text-gray-300 hover:text-cinema-gold px-2 py-1 text-sm">My Account</Link>
+                {canViewUsers && (
+                  <Link to="/users" onClick={() => setMenuOpen(false)} className="text-gray-300 hover:text-cinema-gold px-2 py-1 text-sm">Users</Link>
+                )}
                 <button onClick={handleSignOut} className="text-left text-red-400 px-2 py-1 text-sm">Sign Out</button>
               </>
             ) : (

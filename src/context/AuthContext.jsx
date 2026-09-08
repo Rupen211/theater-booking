@@ -6,6 +6,8 @@ const AuthContext = createContext({})
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [canViewUsers, setCanViewUsers] = useState(false)
 
   useEffect(() => {
     if (!supabase) {
@@ -29,6 +31,22 @@ export function AuthProvider({ children }) {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (!supabase || !user) { setIsAdmin(false); setCanViewUsers(false); return }
+    let cancelled = false
+    supabase
+      .from('users')
+      .select('permission')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (cancelled) return
+        setIsAdmin(data?.permission === 'admin')
+        setCanViewUsers(data?.permission === 'admin' || data?.permission === 'staff')
+      })
+    return () => { cancelled = true }
+  }, [user])
 
   const signIn = async (email, password) => {
     if (!supabase) throw new Error('Supabase is not configured. Add your credentials to .env')
@@ -82,7 +100,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, updateProfile, updateEmail, updatePassword }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, canViewUsers, signIn, signUp, signOut, updateProfile, updateEmail, updatePassword }}>
       {children}
     </AuthContext.Provider>
   )

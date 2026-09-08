@@ -11,6 +11,7 @@ import SeatSelection from './pages/SeatSelection'
 import Confirmation from './pages/Confirmation'
 import SignIn from './pages/SignIn'
 import Profile from './pages/Profile'
+import Users from './pages/Users'
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
                 <Route path="/confirmation" element={<Confirmation />} />
                 <Route path="/signin" element={<SignIn />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/users" element={<Users />} />
               </Routes>
             </main>
             <Footer />
